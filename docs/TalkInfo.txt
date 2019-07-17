@@ -1,0 +1,90 @@
+I Told You to Stand Still ! (Motion Detection Web App with JavaScript)
+Web browsers are getting more and more powerful.
+Now you can easily access the camera, and analyze the images.
+
+Using only a browser, we will access the camera ,
+using WebRTC (Web Real-Time Communications).
+We will capture still frames from the streaming video,
+and analyze the images and create a Motion Detection Web Application,
+using ONLY
+JavaScript.
+
+We will create an app that will detect if
+there is motion,
+the direction,
+and the magnitude.
+
+In this talk, Aydin Akcasu,
+(who has over 10 years of prior experience in computer vision),
+demonstrates how easy it is
+to create a Motion Detector app,
+using only JavaScript and just your web browser.
+
+
+
+
+------------
+
+WevRTC
+WebRTC is a free, open project that provides browsers and mobile applications with Real-Time Communications (RTC) capabilities via simple APIs. The WebRTC components have been optimized to best serve this purpose.
+https://webrtc.org/
+
+
+https://developers.google.com/web/updates/2015/10/media-devices
+
+https://www.html5rocks.com/en/tutorials/getusermedia/intro/
+
+HTML5
+
+
+getUserMedia() has been available since Chrome 21, Opera 18, and Firefox 17. Support was initially provided by the Navigator.getUserMedia() method, but this has been deprecated.
+
+You should now use the navigator.MediaDevices.getUserMedia() method, which is widely supported.
+
+
+-----
+The pace to find a suitable capture API accelerated thanks to the larger WebRTC (Web Real Time Communications) effort. That spec is overseen by the W3C WebRTC Working Group. Google, Opera, Mozilla, and a few others have implementations.
+
+getUserMedia() is related to WebRTC because it's the gateway into that set of APIs. It provides the means to access the user's local camera/microphone stream.
+
+----------
+TODO:
+
+Add twitter output
+
+WebRTC, for others to see!!!!
+https://www.pubnub.com/blog/2014-10-21-building-a-webrtc-video-and-voice-chat-application/
+
+
+Record video, play back:
+https://webrtc.github.io/samples/src/content/getusermedia/record/
+
+Screen share:
+
+https://webrtc.github.io/samples/src/content/getusermedia/getdisplaymedia/
+
+--------
+https://www.html5rocks.com/en/tutorials/webrtc/basics/
+-----
+
+COOL
+https://deepstreamhub.com/tutorials/protocols/webrtc-screen-sharing/
+
+
+----
+
+https://stackoverflow.com/questions/40756009/webrtc-how-do-i-stream-client-as-video-to-client-b
+
+----
+https://flaviocopes.com/webrtc/
+
+-----
+
+
+----
+
+
+----
+
+
+----
