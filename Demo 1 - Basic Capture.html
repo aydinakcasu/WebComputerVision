@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Show Video</title>
+</head>
+
+<body>
+</body>
+<video id="video" autoplay></video>
+
+<script>
+    async function initializeVideo(videoElement) {
+        var constraints = {
+            audio: false,
+            video: { width: 320, height: 240 }
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        videoElement.srcObject = stream;
+
+        // Next Step
+    }
+    var videoElement = document.getElementById('video');
+    initializeVideo(videoElement);
+</script>
+
+
+</html>

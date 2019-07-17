@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<!-- By Aydin Akcasu, @AAkcasu,  -->
+
+<head>
+    <meta charset="utf-8">
+    <title>Final</title>
+</head>
+
+<body>
+    <div class="select">
+        <label for="videoSource">video source: </label><select id="videoSource" onchange=" selectDevice()"></select>,
+        resolution: <select id="resolution" onchange=" selectDevice()">
+            <option value="320,240" selected>320x240</option>
+            <option value="640,480">640x480</option>
+            <option value="1280,960">1280x960</option>
+            <option value="1920,1080">1920x1080</option>
+        </select>,
+        <input type="checkbox" id="rawChecked">show raw</input>
+
+        <br>interval (ms): <select id="intervalInMs" onchange="selectDevice()">
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="200" selected>200</option>
+            <option value="400">400</option>
+            <option value="1000">1000</option>
+            <option value="2000">2000</option>
+        </select>,
+
+        <br>background: <select id="background">
+            <option value="-1">original</option>
+            <option value="0x00" selected>black</option>
+            <option value="0x20">gray1</option>
+            <option value="0x40">gray2</option>
+            <option value="0x60">gray3</option>
+            <option value="0x80">gray</option>
+            <option value="0xFF">white</option>
+        </select>,
+        <input type="checkbox" id="histogramChecked">show histogram</input>,
+        <input type="checkbox" id="meanChecked">show mean</input>
+
+        <br>
+        pixel threshold: <select id="pixelThreshold">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="30" selected>30</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select>,
+
+        move threshold: <select id="moveThreshold">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="30" selected>30</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select>
+
+    </div>
+
+    <div style="font-family: monospace;">
+        <span id="left">xxxx</span> <canvas id="processed"></canvas><span id="right">xxxx</span>
+        <video id="video"></video>
+    </div>
+
+    <div style="font-family: monospace;">
+        <span id="count"></span> (count)
+        <br><span id="xBlueMean"></span> (to)
+        <br><span id="xRedMean"></span> (from)
+        <br><span id="movement"></span> (movement)
+        <br><span id="dir"></span> (direction)
+    </div>
+
+</body>
+
+</html>
+
+<script>
+    let imageParameters = { bytesPerPixel: 4 };
+
+    const getImageOffset = (x, y) => imageParameters.bytesPerPixel * (y * imageParameters.width + x);
+
+    let intervalId = null;
+    const transparencyValues = { full: 0xFF, movedRed: 0xFE, movedBlue: 0xFD };
+
+    const videoSelectElement = document.querySelector('select#videoSource');
+    const resolution = document.getElementById('resolution');
+    const intervalInMsElement = document.getElementById("intervalInMs");
+    var rawChecked = document.getElementById('rawChecked');
+
+    async function selectDevice() {
+        const resolutionList = resolution.options[resolution.selectedIndex].value;
+        const sizeList = resolutionList.split(',');
+        const width = parseInt(sizeList[0]), height = parseInt(sizeList[1]);
+
+        imageParameters = {
+            ...imageParameters,
+            width: width,
+            height: height
+        }
+        await initializeVideo(videoElement, videoSelectElement.value);
+    }
+
+    const background = document.getElementById('background');
+    const histogramChecked = document.getElementById('histogramChecked');
+    const meanChecked = document.getElementById('meanChecked');
+
+    const videoElement = document.getElementById('video');
+
+    const count = document.getElementById('count');
+    const xBlueMean = document.getElementById('xBlueMean');
+    const xRedMean = document.getElementById('xRedMean');
+    const movement = document.getElementById('movement');
+    const dir = document.getElementById('dir');
+    const moveThreshold = document.getElementById("moveThreshold");
+    const pixelThreshold = document.getElementById("pixelThreshold");
+    const left = document.getElementById("left");
+    const right = document.getElementById("right");
+
+    function updateDisplayValues(stats) {
+        const pad = (s, i) => ('_'.repeat(10) + s.toString()).slice(-(i || 8)).replace(/_/g, "&nbsp;");
+
+        count.innerHTML = pad(stats.count);
+        xBlueMean.innerHTML = pad(stats.xBlueMean);
+        xRedMean.innerHTML = pad(stats.xRedMean);
+        const amount = stats.xBlueMean - stats.xRedMean;
+        movement.innerHTML = pad(amount.toFixed(0));
+        const threshold = moveThreshold.options[moveThreshold.selectedIndex].value;
+
+        dir.innerHTML = pad(amount < -threshold ? 'LEFT' : amount > threshold ? 'RIGHT' : '');
+        left.innerHTML = pad(amount < -threshold ? '<<--' : '____', 4);
+        right.innerHTML = pad(amount > threshold ? '-->>' : '____', 4);
+    }
+
+    async function main() {
+        await getDevices()
+        await selectDevice();
+        return;
+
+        async function getDevices() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const devicesSorted = devices
+                .filter(x => x.kind === 'videoinput')
+                .sort((a, b) => b.deviceId.localeCompare(a.deviceId));
+
+            for (item of devicesSorted) {
+                const option = document.createElement('option');
+                option.value = item.deviceId;
+                option.text = item.label || `camera ${videoSelectElement.length + 1}, id: ${item.deviceId.substring(0, 2)}...`;
+                videoSelectElement.appendChild(option);
+            }
+        }
+    }
+    main();
+
+    async function initializeVideo(videoElement, id) {
+
+        const constraints = {
+            audio: false,
+            video: {
+                deviceId: { exact: id },
+                width: imageParameters.width,
+                height: imageParameters.height
+            }
+        };
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            videoElement.autoplay = true;
+            videoElement.srcObject = stream;
+            let intervalInMs = intervalInMsElement.options[intervalInMsElement.selectedIndex].value;
+            intervalInMs = parseInt(intervalInMs);
+            initializeImageCapture(intervalInMs);
+
+        } catch (error) {
+            alert(error);
+        }
+        return;
+
+        function initializeImageCapture(intervalInMs) {
+
+            //const canvas = document.createElement('canvas');
+            const canvas = document.getElementById('processed');
+            canvas.width = imageParameters.width;
+            canvas.height = imageParameters.height;
+
+            const context = canvas.getContext('2d');
+
+            if (intervalId) clearInterval(intervalId);
+            intervalId = setInterval(capture, intervalInMs);
+
+            let previousImage = null;
+            return;
+
+            function capture() {
+
+                videoElement.style.display = rawChecked.checked ? "inline" : "none";
+
+                context.drawImage(videoElement, 0, 0, imageParameters.width, imageParameters.height);
+
+                const tempImage = context.getImageData(0, 0, imageParameters.width, imageParameters.height);
+                const currentImage = context.getImageData(0, 0, imageParameters.width, imageParameters.height);
+
+                const currentData = currentImage.data;
+                const previousData = (previousImage || currentImage).data;
+
+                const backgroundValue = parseInt(background.options[background.selectedIndex].value);
+                imageDifferences(currentData, previousData, backgroundValue);  // Get differences.
+
+                const stats = getStats(currentData);
+
+                drawHistogram(currentData, stats, histogramChecked.checked, meanChecked.checked);
+
+                context.putImageData(currentImage, 0, 0);
+                previousImage = tempImage;
+
+                updateDisplayValues(stats);
+                return;
+
+                function imageDifferences(currentData, previousData, backgroundValue) {
+
+                    backgroundValue = backgroundValue || 0x00;
+                    for (let y = 0; y < imageParameters.height; y++) {
+                        for (let x = 0; x < imageParameters.width; x++) {
+                            let i = getImageOffset(x, y);
+                            const currentPixel = getGrayPixelAtOffset(currentData, i),
+                                previousPixel = getGrayPixelAtOffset(previousData, i);
+
+                            const pixelThresholdMin = pixelThreshold.options[pixelThreshold.selectedIndex].value;
+
+                            const moved = Math.abs(currentPixel - previousPixel) >= pixelThresholdMin;
+                            let red = green = blue = (backgroundValue === -1 ? currentPixel : backgroundValue), transparency = transparencyValues.full;
+                            const enhance = 1;
+                            if (moved) {
+                                red = (currentPixel < previousPixel) ? enhance * (previousPixel - currentPixel) : 0;
+                                green = 0;
+                                blue = (currentPixel > previousPixel) ? enhance * (currentPixel - previousPixel) : 0;
+                                transparency = red !== 0 ? transparencyValues.movedRed : transparencyValues.movedBlue;
+                            }
+                            currentData[i++] = red; currentData[i++] = green; currentData[i++] = blue;
+                            currentData[i++] = transparency;
+                        }
+                    }
+                    return;
+
+                    function getGrayPixelAtOffset(currentData, i) {
+                        const gray = currentData[i] * 0.3 + currentData[i + 1] * 0.6 + currentData[i + 2] * 0.1;
+                        return gray;
+                    }
+                }
+
+                function getStats(currentData) {
+
+                    const result = {
+                        count: 0,
+                        xRedHistogram: (new Array(imageParameters.width)).fill(0), xRedMean: 0.0,
+                        xBlueHistogram: (new Array(imageParameters.width)).fill(0), xBlueMean: 0.0
+                    };
+
+                    // Add to histogram
+                    updateHistogram(currentData, result);
+
+                    // Calculate mean
+                    updateMean(result);
+
+                    return result;
+
+                    function updateHistogram(currentData, result) {
+                        for (let y = 0; y < imageParameters.height; y++) {
+                            for (let x = 0; x < imageParameters.width; x++) {
+                                let i = getImageOffset(x, y);
+                                const currentPixel = getPixelAt(currentData, x, y)
+
+                                const moved = currentPixel.transparency !== transparencyValues.full;
+                                result.count += moved ? 1 : 0;
+
+                                result.xBlueHistogram[x] += currentPixel.transparency === transparencyValues.movedBlue ? 1 : 0;
+                                result.xRedHistogram[x] += currentPixel.transparency === transparencyValues.movedRed ? 1 : 0;
+                            }
+                        }
+                        return;
+
+                        function getPixelAt(currentData, x, y) {
+                            let i = getImageOffset(x, y);
+                            const pixel =
+                            {
+                                red: currentData[i++], green: currentData[i++], blue: currentData[i++],
+                                transparency: currentData[i++]
+                            }
+                            return pixel;
+                        }
+                    }
+                    function updateMean(result) {
+                        let blueSum = 0.0, redSum = 0.0;
+                        let blueCount = 0, redCount = 0;
+
+                        for (let x = 0; x < imageParameters.width; x++) {
+                            redCount += result.xRedHistogram[x]; redSum += x * result.xRedHistogram[x];
+                            blueCount += result.xBlueHistogram[x]; blueSum += x * result.xBlueHistogram[x];
+                        }
+                        const meanThreshold = 100;
+                        result.xBlueMean = blueCount < meanThreshold ? 0 : parseInt(blueSum / blueCount);
+                        result.xRedMean = redCount < meanThreshold ? 0 : parseInt(redSum / redCount);
+                    }
+                }
+
+                function drawHistogram(currentData, stats, histogramChecked, meanChecked) {
+                    const histAreaY = imageParameters.height / 10;
+
+                    if (histogramChecked) {
+                        moveUp(histAreaY);
+                        drawHistogram(histAreaY);
+                    }
+                    if (meanChecked) {
+                        drawMean();
+                    }
+                    return;
+
+                    function moveUp(histAreaY) {
+                        for (let y = 0; y <= imageParameters.height - histAreaY; y++) {
+                            for (let x = 0; x < imageParameters.width; x++) {
+                                let i = getImageOffset(x, y);
+                                let iS = getImageOffset(x, y + histAreaY);
+                                for (let loop = 0; loop < imageParameters.bytesPerPixel; loop++)
+                                    currentData[i++] = currentData[iS++];
+                            }
+                        }
+                    }
+                    function drawHistogram(histAreaY) {
+                        for (let x = 0; x < imageParameters.width; x++) {
+                            for (let y = 0; y < histAreaY; y++) {
+                                let i = getImageOffset(x, imageParameters.height - y);
+                                var drawBlue = stats.xBlueHistogram[x] > 4 * y;
+                                var drawRed = stats.xRedHistogram[x] > 4 * y;
+                                if (drawBlue || drawRed) {
+                                    currentData[i++] = drawRed ? stats.xRedHistogram[x] : 0xFF;
+                                    currentData[i++] = drawBlue || drawRed ? 0x00 : 0xFF;
+                                    currentData[i++] = drawBlue ? stats.xBlueHistogram[x] : 0xFF;
+                                }
+                                else {
+                                    currentData[i++] = currentData[i++] = currentData[i++] = 0xA0;
+                                }
+                            }
+                        }
+                    }
+                    function drawMean() {
+                        for (let y = 0; y < imageParameters.height; y++) {
+                            let iBlue = getImageOffset(stats.xBlueMean, y);
+                            let iRed = getImageOffset(stats.xRedMean, y);
+                            currentData[iBlue++] = 0x00; currentData[iBlue++] = 0x00; currentData[iBlue++] = 0xFF;
+                            currentData[iRed++] = 0xFF; currentData[iRed++] = 0x00; currentData[iRed++] = 0x00;
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+    function beep() {
+        var snd = new Audio("data:audio/wav;base64,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qJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=");
+        snd.play();
+    }
+    //beep();
+</script>
