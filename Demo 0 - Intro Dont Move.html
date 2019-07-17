@@ -4,17 +4,53 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Create A Custom Web Security Camera - Final</title>
+    <title>Create A Custom Web Security Camera - Intro Dont Move</title>
 </head>
 
 <body>
+    <div id="wrapper" style="text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;">
+        <div style=" position: absolute; left: 30px; top: 50px; width: 1920px; font-size: 45px; text-align:center;
+        color: white; ">
+            I Told You to Stand Still !
+            <br>(Web Motion Detection with JavaScript)
+            <br>Create A Custom Web Security Camera
+        </div>
+        <div style=" position: absolute; left: 30px; top: 200px; width: 1920px; font-size: 25px; text-align:center;
+        z-index: 1; color: white;">
+            <br>Aydin Akcasu, AAkcasu@gmail.com, Senior, Sr. Software Engineer, Quicken Loans
+        </div>
+    </div>
+    <div
+        style="font-family: monospace; text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;">
+        <div
+            style="position: absolute; left: 30px; top: 400px; width: 1920px;   font-size: 95px; text-align:center;  color: white;">
+            <span id="left">xxxx</span> <span id="right">xxxx</span>
+        </div>
+
+        <div
+            style="position: absolute; left: 40px; top: 20px; width: 1920px;   font-size: 70px; text-align:left;  color: white;">
+            <span id="countCheck"></span>
+        </div>
+        <div
+            style="position: absolute; left: 40px; top: 100px; width: 1920px;   font-size: 70px; text-align:left;  color: white;">
+            <span id="points"></span>
+        </div>
+        <div
+            style="position: absolute; left: 40px; top: 230px; width: 1920px;   font-size: 100px; text-align:left;  color: white;">
+            <span id="countMove"></span>
+        </div>
+        <canvas id="processed" xxstyle="width: 1920px; height:10800px;background-color: black;"></canvas>
+        <video id="video"></video>
+    </div>
+
+
     <div class="select">
         <label for="videoSource">video source: </label><select id="videoSource" onchange=" selectDevice()"></select>,
         resolution: <select id="resolution" onchange=" selectDevice()">
-            <option value="320,240" selected>320x240</option>
+            <option value="320,240">320x240</option>
             <option value="640,480">640x480</option>
             <option value="1280,960">1280x960</option>
-            <option value="1920,1080">1920x1080</option>
+            <option value="1920,1080" selected>1920x1080</option>
         </select>,
         <input type="checkbox" id="rawChecked">show raw</input>
 
@@ -28,8 +64,8 @@
         </select>,
 
         <br>background: <select id="background">
-            <option value="-1">original</option>
-            <option value="0x00" selected>black</option>
+            <option value="-1" selected>original</option>
+            <option value="0x00">black</option>
             <option value="0x20">gray1</option>
             <option value="0x40">gray2</option>
             <option value="0x60">gray3</option>
@@ -40,13 +76,26 @@
         <input type="checkbox" id="meanChecked">show mean</input>
 
         <br>
+        countl threshold: <select id="countThreshold">
+            <option value="10000">10000</option>
+            <option value="20000">20000</option>
+            <option value="30000">30000</option>
+            <option value="40000" selected>40000</option>
+            <option value="50000">50000</option>
+            <option value="100000">100000</option>
+            <option value="150000">150000</option>
+            <option value="200000">200000</option>
+            <option value="400000">400000</option>
+        </select>,
+
+        <br>
         pixel threshold: <select id="pixelThreshold">
             <option value="0">0</option>
             <option value="1">1</option>
             <option value="5">5</option>
             <option value="10">10</option>
-            <option value="20">20</option>
-            <option value="30" selected>30</option>
+            <option value="20" selected>20</option>
+            <option value="30">30</option>
             <option value="50">50</option>
             <option value="100">100</option>
         </select>,
@@ -61,10 +110,7 @@
 
     </div>
 
-    <div style="font-family: monospace;">
-        <span id="left">xxxx</span> <canvas id="processed"></canvas><span id="right">xxxx</span>
-        <video id="video"></video>
-    </div>
+
 
     <div style="font-family: monospace;">
         <span id="count"></span> (count)
@@ -73,7 +119,6 @@
         <br><span id="movement"></span> (movement)
         <br><span id="dir"></span> (direction)
     </div>
-
 </body>
 
 </html>
@@ -117,13 +162,35 @@
     const dir = document.getElementById('dir');
     const moveThreshold = document.getElementById("moveThreshold");
     const pixelThreshold = document.getElementById("pixelThreshold");
+
+    const countCheck = document.getElementById("countCheck");
+    const countThreshold = document.getElementById("countThreshold");
+    const countMove = document.getElementById("countMove");
+    const points = document.getElementById("points");
+
     const left = document.getElementById("left");
     const right = document.getElementById("right");
 
+    let stillCountMax = 10, stillCountDown = stillCountMax;
+    let pointCount = 0;
+    let firstTime = true;
+
     function updateDisplayValues(stats) {
+        if (pointCount > 10) return;
+
+        if (firstTime) {
+            firstTime = false;
+            try {
+
+                audienceIntro();
+            } catch (e) {
+                debugger
+            }
+
+        }
         const pad = (s, i) => ('_'.repeat(10) + s.toString()).slice(-(i || 8)).replace(/_/g, "&nbsp;");
 
-        count.innerHTML = pad(stats.count);
+        count.innerHTML = pad(stats.count.toLocaleString(), 10);
         xBlueMean.innerHTML = pad(stats.xBlueMean);
         xRedMean.innerHTML = pad(stats.xRedMean);
         const amount = stats.xBlueMean - stats.xRedMean;
@@ -131,25 +198,86 @@
         const threshold = moveThreshold.options[moveThreshold.selectedIndex].value;
 
         dir.innerHTML = pad(amount < -threshold ? 'LEFT' : amount > threshold ? 'RIGHT' : '');
-        left.innerHTML = pad(amount < -threshold ? '<<--' : '____', 4);
-        right.innerHTML = pad(amount > threshold ? '-->>' : '____', 4);
+        left.innerHTML = pad(amount < -threshold ? '    ' : '____', 4);
+        right.innerHTML = pad(amount > threshold ? '    ' : '____', 4);
+        const countThresholdValue = countThreshold.options[countThreshold.selectedIndex].value;
+        const still = stats.count <= countThresholdValue;
+        if (still) {
+            if (stillCountDown === 1) pointCount++;
+            stillCountDown = Math.max(--stillCountDown, 0);
+            if (stillCountDown === 0) stillCountDown = stillCountMax;
+        }
+        else {
+            if (stillCountDown <= 4) audienceWarning();
+            stillCountDown = stillCountMax;
+        }
+        countCheck.innerHTML = `COUNT DOWN: ${parseInt(stillCountDown)}`; // + pad(stats.count.toLocaleString(), 10);
+
+        const message = (stats.count > countThresholdValue) ? '&#128544;&#128544;&#128544; DONT MOVE!'
+            : (stats.count > 0.70 * countThresholdValue) ? '&#128544;&#128544;&#128512; Stop fidgeting! ' : '&#128512;&#128512;&#128512; Good, stay still';
+        countMove.innerHTML = message;
+
+        points.innerHTML = `POINTS: ${pointCount}/10`;
+        const color = (stats.count > countThresholdValue) ? 'red'
+            : (stats.count > 0.70 * countThresholdValue) ? 'yellow' : 'green';
+        countMove.style.color = color;
+
+        if (pointCount > 10) audienceStill();
     }
+    function audienceIntro() {
+        const audioMessage = async () => {
+            var audio = new Audio('audio/audienceIntro.m4a');
+            await audio.play();
+        }
+        audioMessage()
+
+        // alert('Before we introduce the next guest, everybody needs to still down, be quiet, and DONT MOVE');
+    }
+    function audienceWarning() {
+        const audioMessage = async () => {
+            var audio = new Audio('audio/audienceWarning.m4a');
+            await audio.play();
+        }
+        audioMessage()
+
+        // alert('I said DONT MOVE!');
+    }
+    function audienceStill() {
+        const audioMessage = async () => {
+            var audio = new Audio('audio/audienceThanks.m4a');
+            await audio.play();
+        }
+        audioMessage()
+
+        //alert('Thanks everybody, good job!');
+        //alert('I would like to introduce our next guest, Aydin Akcasu');
+    }
+    function beep() {
+        var snd = new Audio("data:audio/wav;base64,//uQRAAAAWMSLwUIYAAsYkXgoQwAEaYLWfkWgAI0wWs/ItAAAGDgYtAgAyN+QWaAAihwMWm4G8QQRDiMcCBcH3Cc+CDv/7xA4Tvh9Rz/y8QADBwMWgQAZG/ILNAARQ4GLTcDeIIIhxGOBAuD7hOfBB3/94gcJ3w+o5/5eIAIAAAVwWgQAVQ2ORaIQwEMAJiDg95G4nQL7mQVWI6GwRcfsZAcsKkJvxgxEjzFUgfHoSQ9Qq7KNwqHwuB13MA4a1q/DmBrHgPcmjiGoh//EwC5nGPEmS4RcfkVKOhJf+WOgoxJclFz3kgn//dBA+ya1GhurNn8zb//9NNutNuhz31f////9vt///z+IdAEAAAK4LQIAKobHItEIYCGAExBwe8jcToF9zIKrEdDYIuP2MgOWFSE34wYiR5iqQPj0JIeoVdlG4VD4XA67mAcNa1fhzA1jwHuTRxDUQ//iYBczjHiTJcIuPyKlHQkv/LHQUYkuSi57yQT//uggfZNajQ3Vmz+Zt//+mm3Wm3Q576v////+32///5/EOgAAADVghQAAAAA//uQZAUAB1WI0PZugAAAAAoQwAAAEk3nRd2qAAAAACiDgAAAAAAABCqEEQRLCgwpBGMlJkIz8jKhGvj4k6jzRnqasNKIeoh5gI7BJaC1A1AoNBjJgbyApVS4IDlZgDU5WUAxEKDNmmALHzZp0Fkz1FMTmGFl1FMEyodIavcCAUHDWrKAIA4aa2oCgILEBupZgHvAhEBcZ6joQBxS76AgccrFlczBvKLC0QI2cBoCFvfTDAo7eoOQInqDPBtvrDEZBNYN5xwNwxQRfw8ZQ5wQVLvO8OYU+mHvFLlDh05Mdg7BT6YrRPpCBznMB2r//xKJjyyOh+cImr2/4doscwD6neZjuZR4AgAABYAAAABy1xcdQtxYBYYZdifkUDgzzXaXn98Z0oi9ILU5mBjFANmRwlVJ3/6jYDAmxaiDG3/6xjQQCCKkRb/6kg/wW+kSJ5//rLobkLSiKmqP/0ikJuDaSaSf/6JiLYLEYnW/+kXg1WRVJL/9EmQ1YZIsv/6Qzwy5qk7/+tEU0nkls3/zIUMPKNX/6yZLf+kFgAfgGyLFAUwY//uQZAUABcd5UiNPVXAAAApAAAAAE0VZQKw9ISAAACgAAAAAVQIygIElVrFkBS+Jhi+EAuu+lKAkYUEIsmEAEoMeDmCETMvfSHTGkF5RWH7kz/ESHWPAq/kcCRhqBtMdokPdM7vil7RG98A2sc7zO6ZvTdM7pmOUAZTnJW+NXxqmd41dqJ6mLTXxrPpnV8avaIf5SvL7pndPvPpndJR9Kuu8fePvuiuhorgWjp7Mf/PRjxcFCPDkW31srioCExivv9lcwKEaHsf/7ow2Fl1T/9RkXgEhYElAoCLFtMArxwivDJJ+bR1HTKJdlEoTELCIqgEwVGSQ+hIm0NbK8WXcTEI0UPoa2NbG4y2K00JEWbZavJXkYaqo9CRHS55FcZTjKEk3NKoCYUnSQ0rWxrZbFKbKIhOKPZe1cJKzZSaQrIyULHDZmV5K4xySsDRKWOruanGtjLJXFEmwaIbDLX0hIPBUQPVFVkQkDoUNfSoDgQGKPekoxeGzA4DUvnn4bxzcZrtJyipKfPNy5w+9lnXwgqsiyHNeSVpemw4bWb9psYeq//uQZBoABQt4yMVxYAIAAAkQoAAAHvYpL5m6AAgAACXDAAAAD59jblTirQe9upFsmZbpMudy7Lz1X1DYsxOOSWpfPqNX2WqktK0DMvuGwlbNj44TleLPQ+Gsfb+GOWOKJoIrWb3cIMeeON6lz2umTqMXV8Mj30yWPpjoSa9ujK8SyeJP5y5mOW1D6hvLepeveEAEDo0mgCRClOEgANv3B9a6fikgUSu/DmAMATrGx7nng5p5iimPNZsfQLYB2sDLIkzRKZOHGAaUyDcpFBSLG9MCQALgAIgQs2YunOszLSAyQYPVC2YdGGeHD2dTdJk1pAHGAWDjnkcLKFymS3RQZTInzySoBwMG0QueC3gMsCEYxUqlrcxK6k1LQQcsmyYeQPdC2YfuGPASCBkcVMQQqpVJshui1tkXQJQV0OXGAZMXSOEEBRirXbVRQW7ugq7IM7rPWSZyDlM3IuNEkxzCOJ0ny2ThNkyRai1b6ev//3dzNGzNb//4uAvHT5sURcZCFcuKLhOFs8mLAAEAt4UWAAIABAAAAAB4qbHo0tIjVkUU//uQZAwABfSFz3ZqQAAAAAngwAAAE1HjMp2qAAAAACZDgAAAD5UkTE1UgZEUExqYynN1qZvqIOREEFmBcJQkwdxiFtw0qEOkGYfRDifBui9MQg4QAHAqWtAWHoCxu1Yf4VfWLPIM2mHDFsbQEVGwyqQoQcwnfHeIkNt9YnkiaS1oizycqJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=");
+        snd.play();
+    }
+    //beep();
 
     async function main() {
+
         await getDevices()
         await selectDevice();
         return;
 
         async function getDevices() {
+            const ignoreIdPrefix = 8117;
+            const getIdNumberDiff = (x) => parseInt(x.substring(0, 4)) - ignoreIdPrefix;
             const devices = await navigator.mediaDevices.enumerateDevices();
             const devicesSorted = devices
                 .filter(x => x.kind === 'videoinput')
-                .sort((a, b) => b.deviceId.localeCompare(a.deviceId));
+                //.sort((a, b) => b.deviceId.localeCompare(a.deviceId));
+                .sort((a, b) => getIdNumberDiff(a.deviceId) > getIdNumberDiff(b.deviceId));
 
             for (item of devicesSorted) {
                 const option = document.createElement('option');
                 option.value = item.deviceId;
-                option.text = item.label || `camera ${videoSelectElement.length + 1}, id: ${item.deviceId.substring(0, 2)}...`;
+                option.text = item.label || `camera ${videoSelectElement.length + 1}, id: ${item.deviceId.substring(0, 5)}...`;
+                console.log(`${item.deviceId}`)
                 videoSelectElement.appendChild(option);
             }
         }
@@ -222,7 +350,6 @@
 
                 function imageDifferences(currentData, previousData, backgroundValue) {
 
-                    backgroundValue = backgroundValue || 0x00;
                     for (let y = 0; y < imageParameters.height; y++) {
                         for (let x = 0; x < imageParameters.width; x++) {
                             let i = getImageOffset(x, y);
@@ -235,9 +362,9 @@
                             let red = green = blue = (backgroundValue === -1 ? currentPixel : backgroundValue), transparency = transparencyValues.full;
                             const enhance = 1;
                             if (moved) {
-                                red = (currentPixel < previousPixel) ? enhance * (previousPixel - currentPixel) : 0;
+                                red = (currentPixel < previousPixel) ? enhance * Math.abs(previousPixel - currentPixel) : 0;
                                 green = 0;
-                                blue = (currentPixel > previousPixel) ? enhance * (currentPixel - previousPixel) : 0;
+                                blue = (currentPixel > previousPixel) ? enhance * Math.abs(currentPixel - previousPixel) : 0;
                                 transparency = red !== 0 ? transparencyValues.movedRed : transparencyValues.movedBlue;
                             }
                             currentData[i++] = red; currentData[i++] = green; currentData[i++] = blue;
@@ -359,9 +486,5 @@
 
         }
     }
-    function beep() {
-        var snd = new Audio("data:audio/wav;base64,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qJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU=");
-        snd.play();
-    }
-    //beep();
+
 </script>
