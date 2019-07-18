@@ -172,11 +172,14 @@
     const right = document.getElementById("right");
 
     let stillCountMax = 10, stillCountDown = stillCountMax;
-    let pointCount = 0;
+    let pointMax = 10, pointCount = 0;
     let firstTime = true;
 
     function updateDisplayValues(stats) {
-        if (pointCount > 10) return;
+        if (pointCount >= pointMax) {
+            audienceStill();
+            return;
+        }
 
         if (firstTime) {
             firstTime = false;
@@ -222,7 +225,6 @@
             : (stats.count > 0.70 * countThresholdValue) ? 'yellow' : 'green';
         countMove.style.color = color;
 
-        if (pointCount > 10) audienceStill();
     }
     function audienceIntro() {
         const audioMessage = async () => {
