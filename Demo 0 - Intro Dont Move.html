@@ -8,6 +8,7 @@
 </head>
 
 <body>
+    <button id="startButton" onclick="start()">Start</button>
     <div id="wrapper" style="text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;">
         <div style=" position: absolute; left: 30px; top: 50px; width: 1920px; font-size: 45px; text-align:center;
         color: white; ">
@@ -24,7 +25,7 @@
         style="font-family: monospace; text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;">
         <div
             style="position: absolute; left: 30px; top: 400px; width: 1920px;   font-size: 95px; text-align:center;  color: white;">
-            <span id="left">xxxx</span> <span id="right">xxxx</span>
+            <span id="left"></span> <span id="right"></span>
         </div>
 
         <div
@@ -175,11 +176,23 @@
     let pointMax = 10, pointCount = 0;
     let firstTime = true;
 
+    let run = false;
+    function start() {
+        const aaa = document.getElementById('startButton');
+        aaa.parentNode.removeChild(aaa);
+
+        run = true;
+    }
     function updateDisplayValues(stats) {
+        if (!run) return;
+        if (pointCount > pointMax) return;
+
         if (pointCount >= pointMax) {
             audienceStill();
+            pointCount++;
             return;
         }
+        if (pointCount > pointMax) return;
 
         if (firstTime) {
             firstTime = false;
@@ -284,6 +297,7 @@
             }
         }
     }
+
     main();
 
     async function initializeVideo(videoElement, id) {
